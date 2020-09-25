@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook-svc-{{ .Values.service.typelower }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    cattle.io/creator: norman
+  annotations:    # 如果使用rancher，以下三行必须添加，会导出一些相关数据,如果使用原生集群，建议去掉以下三行数据
+    field.cattle.io/targetWorkloadIds: '["deployment:{{ .Values.namespace }}:{{ include "webhook.fullname" . }}"]'
+    workload.cattle.io/targetWorkloadIdNoop: "true"
+    workload.cattle.io/workloadPortBased: "true"
+{{ include "webhook.labels" . | indent 4 }}
+spec:
+  {{- if eq .Values.service.type .Values.type2 }}
+  externalTrafficPolicy: Cluster
+  {{- end }}
+  {{- if eq .Values.service.type .Values.type1 }}
+  type: {{ .Values.service.type }}
+  ports:
+    - name: {{ include "webhook.fullname" . }}-svc-{{ .Values.service.typelower }} 
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+  {{- end }}
+  {{- if eq .Values.service.type .Values.type2 }}
+  type: {{ .Values.service.type }}
+  ports:
+    - name: {{ include "webhook.fullname" . }}-svc-{{ .Values.service.typelower }} 
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      nodePort: {{ .Values.service.nodePort }}
+  {{- end }}
+  selector:
+    app.kubernetes.io/name: {{ include "webhook.name" . }}  # 要跟deployment中label信息一致
+    app.kubernetes.io/instance: {{ .Release.Name }}  # 要跟deployment中label信息一致
+  sessionAffinity: None

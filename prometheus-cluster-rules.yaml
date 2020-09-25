@@ -1,0 +1,632 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-cluster-cattle-prometheus-rulefiles-consutom
+  namespace: cattle-prometheus
+data:
+  cattle-prometheus-compatible-v116-deprecated-metrics.yaml: |
+    groups:
+    # --------------------------添加prometheus告警规则-------------------------------
+    - name: Node Clock Ruels
+      rules:
+      - alert: "时钟同步异常"
+        expr: abs(node_timex_offset_seconds{job="expose-node-metrics"}) > 1
+        for: 2m
+        labels:
+          severity: Warning
+        annotations:
+          summary: "时钟同步异常,超过1秒"
+          description: "Node-exporter {{ $labels.namespace }}/{{ $labels.pod }} 检测到服务器 {{ $labels.namespace }}/{{ $labels.node }} 时钟不同步,请调整服务器时钟."
+          value: "{{ $labels.namespace }}/{{ $labels.pod }}"
+    - name: Node Rules
+      rules:
+      - alert: "Memory使用率"
+        expr: round((1 - sum(node_memory_MemAvailable_bytes) by (node) / sum(node_memory_MemTotal_bytes) by (node)) * 100 , 0.01) > 85
+        for: 5m
+        labels:
+          Memory: memory
+          severity: Critical
+        annotations:
+          summary: "Memory使用率"
+          description: "当前服务器 {{ $labels.node }} 的内存使用率，持续5分钟，超过85%"
+          value: "{{ $value }}%"
+      - alert: "Memory使用率"
+        expr: 85 > round((1 - sum(node_memory_MemAvailable_bytes) by (node) / sum(node_memory_MemTotal_bytes) by (node)) * 100 , 0.01) > 70
+        for: 5m
+        labels:
+          Memory: memory
+          severity: Warning
+        annotations:
+          summary: "Memory使用率"
+          description: "当前服务器 {{ $labels.node }} 的内存使用率，持续5分钟，超过70%"
+          value: "{{ $value }}%"
+      - alert: "CPU使用率"
+        expr: round((1 - (avg(irate(node_cpu_seconds_total{mode="idle"}[5m])) by (node))) * 100 , 0.01) > 90
+        for: 5m
+        labels:
+          Cpu: cpu
+          severity: Critical
+        annotations:
+          summary: "CPU使用率"
+          description: "当前服务器 {{ $labels.node }} 的CPU使用率，持续5分钟，超过90%"
+          value: "{{ $value }}%"
+      - alert: "CPU使用率"
+        expr: 90 > round((1 - (avg(irate(node_cpu_seconds_total{mode="idle"}[5m])) by (node))) * 100 , 0.01) > 70
+        for: 5m
+        labels:
+          Cpu: cpu
+          severity: Warning
+        annotations:
+          summary: "CPU使用率"
+          description: "当前服务器 {{ $labels.node }} 的CPU使用率，持续5分钟，超70%"
+          value: "{{ $value }}%"
+      - alert: "主机负载"
+        expr:  round(sum(node_load5) by (node) / count(node_cpu_seconds_total{mode="system"}) by (node) , 0.01 ) > 10
+        for: 5m
+        labels:
+          Load5: Load5
+          severity: Critical
+        annotations:
+          summary: "主机负载-5分钟"
+          description: "{{ $labels.node }} 服务器5分钟负载，平均值超过10"
+          value: "{{ $value }}"
+      - alert: "主机负载"
+        expr: 10 >  round(sum(node_load5) by (node) / count(node_cpu_seconds_total{mode="system"}) by (node) , 0.01 ) > 6
+        for: 5m
+        labels:
+          Load5: Load5
+          severity: Warning
+        annotations:
+          summary: "主机负载-5分钟"
+          description: "{{ $labels.node }} 服务器5分钟负载，平均值超过6"
+          value: "{{ $value }}"
+      - alert: "磁盘空间"
+        expr: round(((sum(node_filesystem_size_bytes{device!="rootfs"}) by (node) - sum(node_filesystem_free_bytes{device!="rootfs"}) by (node)) / sum(node_filesystem_size_bytes{device!="rootfs"}) by (node)) * 100 , 0.01) > 90
+        for: 5m
+        labels:
+          Disk: DiskSpace
+          severity: Warning
+        annotations:
+          summary: "磁盘空间"
+          description: "{{ $labels.node }} 服务器磁盘使用量超过90%"
+          value: "{{ $value }}%"
+      - alert: "磁盘I/O"
+        expr: round(sum(rate(node_disk_read_bytes_total[5m])) by (node)/1024/1024 , 0.01) > 10
+        for: 5m
+        labels:
+          DiskioRead: DiskioRead
+          severity: Critical
+        annotations:
+          summary: "磁盘I/O-读"
+          description: "{{ $labels.node }} 服务器5分钟平均磁盘I/O-读较高,已经超过10M/s."
+          value: "{{ $value }}Mbps"
+      - alert: "磁盘I/O"
+        expr: round(sum(rate(node_disk_written_bytes_total[5m])) by (node)/1024/1024 , 0.01) > 10
+        for: 5m
+        labels:
+          DiskioWrite: DiskioWrite
+          severity: Critical
+        annotations:
+          summary: "磁盘I/O-写"
+          description: "{{ $labels.node }} 服务器5分钟平均磁盘I/O-写较高,已经超过10M/s."
+          value: "{{ $value }}Mbps"
+      - alert: "网络数据包"
+        expr: round(sum(rate(node_network_receive_drop_total{device!~"lo | veth.* | docker.* | flannel.* | cali.* | cbr."}[5m])) by (node) , 0.01) > 100
+        for: 5m
+        labels:
+          Network: Network_receive_drop
+          severity: Warning
+        annotations:
+          summary: "网络数据包-接收丢包"
+          description: "{{ $labels.node }} 服务器5分钟平均接收丢包超过100Pps."
+          value: "{{ $value }}Pps"
+      - alert: "网络数据包"
+        expr: round(sum(rate(node_network_receive_errs_total{device!~"lo | veth.* | docker.* | flannel.* | cali.* | cbr."}[5m])) by (node) , 0.01) > 20
+        for: 5m
+        labels:
+          Network: Network_receive_errs
+          severity: Warning
+        annotations:
+          summary: "网络数据包-接收错误包"
+          description: "{{ $labels.node }} 服务器5分钟平均接收错误包超过20Pps."
+          value: "{{ $value }}Pps"
+      - alert: "网络数据包"
+        expr: round(sum(rate(node_network_receive_packets_total{device!~"lo | veth.* | docker.* | flannel.* | cali.* | cbr."}[5m])) by (node) , 0.01) > 2000
+        for: 5m
+        labels:
+          Network: Network_receive_packets
+          severity: Warning
+        annotations:
+          summary: "网络数据包-接收包"
+          description: "{{ $labels.node }} 服务器5分钟平均接收包超过2000Pps."
+          value: "{{ $value }}Pps"
+      - alert: "网络数据包"
+        expr: round(sum(rate(node_network_transmit_drop_total{device!~"lo | veth.* | docker.* | flannel.* | cali.* | cbr."}[5m])) by (node) , 0.01) > 100
+        for: 5m
+        labels:
+          Network: Network_transmit_drop
+          severity: Warning
+        annotations:
+          summary: "网络数据包-发送丢包"
+          description: "{{ $labels.node }} 服务器5分钟平均发送丢包超过100Pps."
+          value: "{{ $value }}Pps"
+      - alert: "网络数据包"
+        expr: round(sum(rate(node_network_transmit_errs_total{device!~"lo | veth.* | docker.* | flannel.* | cali.* | cbr."}[5m])) by (node) , 0.01) > 20
+        for: 5m
+        labels:
+          Network: Network_transmit_errs
+          severity: Warning
+        annotations:
+          summary: "网络数据包-发送错误包"
+          description: "{{ $labels.node }} 服务器5分钟平均发送错误包超过20Pps."
+          value: "{{ $value }}Pps"
+      - alert: "网络数据包"
+        expr: round(sum(rate(node_network_transmit_packets_total{device!~"lo | veth.* | docker.* | flannel.* | cali.* | cbr."}[5m])) by (node) , 0.01) > 2000
+        for: 5m
+        labels:
+          Network: Network_transmit_packets
+          severity: Warning
+        annotations:
+          summary: "网络数据包-发送包"
+          description: "{{ $labels.node }} 服务器5分钟平均发送包超过2000Pps."
+          value: "{{ $value }}Pps"
+      - alert: "网络I/O"
+        expr: round(sum(rate(node_network_receive_bytes_total{device!~"lo | veth.* | docker.* | flannel.* | cali.* | cbr."}[5m])) by (node) / 1024/1024  , 0.01) > 10
+        for: 5m
+        labels:
+          Network: Network_receive
+          severity: Warning
+        annotations:
+          summary: "网络I/O-接收速率"
+          description: "{{ $labels.node }} 服务器5分钟平均网络I/O-接收速率超过10Mbps."
+          value: "{{ $value }}Mbps"
+      - alert: "网络I/O"
+        expr: round(sum(rate(node_network_transmit_bytes_total{device!~"lo | veth.* | docker.* | flannel.* | cali.* | cbr."}[5m])) by (node) / 1024 /1024 , 0.01) > 10
+        for: 5m
+        labels:
+          Network: Network_transmit
+          severity: Warning
+        annotations:
+          summary: "网络I/O-发送速率"
+          description: "{{ $labels.node }} 服务器5分钟平均网络I/O-发送速率超过10Mbps."
+          value: "{{ $value }}Mbps"
+
+    - name: Etcd Rules
+      rules:
+      - alert: "Etcd领导者"
+        expr: max(etcd_server_has_leader) > 1
+        for: 5m
+        labels:
+          EtcdLeader: EtcdLeader
+          severity: Critical
+        annotations:
+          summary: "EtcdLeader个数"
+          description: "当前集群Etcd领导者个数大于1,存在异常,请立即解决此问题,否则集群不可用"
+          value: "{{ $value }}个"
+      - alert: "Etcd领导者"
+        expr: max(etcd_server_leader_changes_seen_total) > 3
+        for: 5m
+        labels:
+          EtcdLeader: EtcdLeader
+          severity: Critical
+        annotations:
+          summary: "EtcdLeader变更次数"
+          description: "当前集群EtcdLeader变更频繁,请检查集群Etcd状况"
+          value: "{{ $value }}次"
+      - alert: "Etcd-GRPC客户端流量"
+        expr: round(sum(rate(etcd_network_client_grpc_received_bytes_total[5m])) by (node)/1024/1024 , 0.01) > 1
+        for: 5m
+        labels:
+          network_client_grpc_received: network_client_grpc_received
+          severity: Warning
+        annotations:
+          summary: "Etcd-GRPC客户端流量-接收"
+          description: "Etcd-GRPC客户端流量-接收速率,5分钟平均速率超过1Mbps."
+          value: "{{ $value }}Kbps"
+      - alert: "Etcd-GRPC客户端流量"
+        expr: round(sum(rate(etcd_network_client_grpc_sent_bytes_total[5m])) by (node)/1024/1024 , 0.01) > 1
+        for: 5m
+        labels:
+          network_client_grpc_sent: network_client_grpc_sent
+          severity: Warning
+        annotations:
+          summary: "Etcd-GRPC客户端流量-发送"
+          description: "Etcd-GRPC客户端流量-发送速率,5分钟平均速率超过1Mbps."
+          value: "{{ $value }}Kbps"
+      - alert: "Etcd-DB大小"
+        expr: round(sum(etcd_debugging_mvcc_db_total_size_in_bytes) by (node)/1024/1024/1024 , 0.01) > 1
+        for: 5m
+        labels:
+          db_total_size: db_total_size
+          severity: Warning
+        annotations:
+          summary: "Etcd-DB大小"
+          description: "Etcd数据库大小超过1Gib,请及时进行压缩备份数据库."
+          value: "{{ $value }}MiB"
+
+    - name: App Rules
+      rules:
+      - alert: "App-CPU"
+        expr: round(sum(  node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate * on(namespace,pod)  group_left(workload, workload_type) mixin_pod_workload{workload_type="deployment"}) by (workload, workload_type) , 0.01) * 1000 > 5000
+        for: 3m
+        labels:
+          severity: Warning
+        annotations:
+          summary: "App-CPU"
+          description: "App {{ $labels.namespace }}/{{ $labels.workload }} CPU使用大于5000mCPU."
+          value: "{{ $value }}mCPU"
+      - alert: "App-Memory"
+        expr: round(sum(container_memory_working_set_bytes{container!=""}  * on(namespace,pod)  group_left(workload, workload_type) mixin_pod_workload{workload_type="deployment"}) by (workload, workload_type)/1024/1024/1024 , 0.01) > 5
+        for: 3m
+        labels:
+          severity: Warning
+        annotations:
+          summary: "App-Memory"
+          description: "App {{ $labels.namespace }}/{{ $labels.workload }} Memory使用大于5G."
+          value: "{{ $value }}G"
+      - alert: "App-磁盘I/O"
+        expr: round(sum(rate(container_fs_reads_bytes_total{container!=""}[5m]) * on(namespace,pod)  group_left(workload, workload_type) mixin_pod_workload{workload_type="deployment"}  ) by (namespace,workload)/1024/1024 , 0.01) > 10
+        for: 5m
+        labels:
+          DiskioRead: DiskioRead
+          severity: Warning
+        annotations:
+          summary: "App-磁盘I/O-读"
+          description: "App {{ $labels.namespace }}/{{ $labels.workload }} 5分钟平均磁盘读I/O较高,已经超过10M/s."
+          value: "{{ $value }}Mbps"
+      - alert: "App-磁盘I/O"
+        expr: round(sum(rate(container_fs_writes_bytes_total{container!=""}[5m]) * on(namespace,pod)  group_left(workload, workload_type) mixin_pod_workload{workload_type="deployment"}  ) by (namespace,workload) /1024/1024 , 0.01) > 10
+        for: 5m
+        labels:
+          DiskioWrite: DiskioWrite
+          severity: Warning
+        annotations:
+          summary: "App-磁盘I/O-写"
+          description: "App {{ $labels.namespace }}/{{ $labels.workload }} 5分钟平均磁盘写I/O较高,已经超过10M/s."
+          value: "{{ $value }}Mbps"
+      - alert: "App-网络I/O"
+        expr: round(sum(rate(container_network_receive_bytes_total{container_name!=""}[5m]) * on(namespace,pod)  group_left(workload, workload_type) mixin_pod_workload{workload_type="deployment"}  ) by (namespace,workload) /1024/1024 , 0.01) > 5
+        for: 5m
+        labels:
+          Network: Network_receive
+          severity: Warning
+        annotations:
+          summary: "App-网络I/O-接收速率"
+          description: "App {{ $labels.namespace }}/{{ $labels.workload }} 5分钟平均网络I/O-接收速率超过5Mbps."
+          value: "{{ $value }}Mbps"
+      - alert: "App-网络I/O"
+        expr: round(sum(rate(container_network_transmit_bytes_total{container_name!=""}[5m]) * on(namespace,pod)  group_left(workload, workload_type) mixin_pod_workload{workload_type="deployment"}  ) by (namespace,workload) /1024/1024 , 0.01) > 5
+        for: 5m
+        labels:
+          Network: Network_transmit
+          severity: Warning
+        annotations:
+          summary: "App-网络I/O-发送速率"
+          description: "App {{ $labels.namespace }}/{{ $labels.workload }} 5分钟平均网络I/O-发送速率超过5Mbps."
+          value: "{{ $value }}Mbps"
+      - alert: "App-网络数据包"
+        expr: round(sum(rate(container_network_receive_packets_dropped_total{container_name!=""}[5m]) * on(namespace,pod)  group_left(workload, workload_type) mixin_pod_workload{workload_type="deployment"}  ) by (namespace,workload) , 0.01) > 100
+        for: 5m
+        labels:
+          Network: Network_receive_drop
+          severity: Warning
+        annotations:
+          summary: "App-网络数据包-接收丢包"
+          description: "App {{ $labels.namespace }}/{{ $labels.workload }} 5分钟平均接收丢包超过100Pps."
+          value: "{{ $value }}Pps"
+      - alert: "App-网络数据包"
+        expr: round(sum(rate(container_network_receive_errors_total{container_name!=""}[5m]) * on(namespace,pod)  group_left(workload, workload_type) mixin_pod_workload{workload_type="deployment"}  ) by (namespace,workload) , 0.01) > 20
+        for: 5m
+        labels:
+          Network: Network_receive_errs
+          severity: Warning
+        annotations:
+          summary: "App-网络数据包-接收错误包"
+          description: "App {{ $labels.namespace }}/{{ $labels.workload }} 5分钟平均接收错误包超过20Pps."
+          value: "{{ $value }}Pps"
+      - alert: "App-网络数据包"
+        expr: round(sum(rate(container_network_receive_packets_total{container_name!=""}[5m]) * on(namespace,pod)  group_left(workload, workload_type) mixin_pod_workload{workload_type="deployment"}  ) by (namespace,workload) , 0.01) > 1000
+        for: 5m
+        labels:
+          Network: Network_receive_packets
+          severity: Warning
+        annotations:
+          summary: "App-网络数据包-接收包"
+          description: "App {{ $labels.namespace }}/{{ $labels.workload }} 5分钟平均丢包超过000Pps."
+          value: "{{ $value }}Pps"
+      - alert: "App-网络数据包"
+        expr: round(sum(rate(container_network_transmit_packets_dropped_total{container_name!=""}[5m]) * on(namespace,pod)  group_left(workload, workload_type) mixin_pod_workload{workload_type="deployment"}  ) by (namespace,workload) , 0.01) > 100
+        for: 5m
+        labels:
+          Network: Network_transmit_drop
+          severity: Warning
+        annotations:
+          summary: "App-网络数据包-发送丢包"
+          description: "App {{ $labels.namespace }}/{{ $labels.workload }} 5分钟平均接收丢包超过100Pps."
+          value: "{{ $value }}Pps"
+      - alert: "App-网络数据包"
+        expr: round(sum(rate(container_network_transmit_errors_total{container_name!=""}[5m]) * on(namespace,pod)  group_left(workload, workload_type) mixin_pod_workload{workload_type="deployment"}  ) by (namespace,workload) , 0.01) > 20
+        for: 5m
+        labels:
+          Network: Network_transmit_errs
+          severity: Warning
+        annotations:
+          summary: "App-网络数据包-发送错误包"
+          description: "App {{ $labels.namespace }}/{{ $labels.workload }} 5分钟平均接收错误包超过20Pps."
+          value: "{{ $value }}Pps"
+      - alert: "App-网络数据包"
+        expr: round(sum(rate(container_network_transmit_packets_total{container_name!=""}[5m]) * on(namespace,pod)  group_left(workload, workload_type) mixin_pod_workload{workload_type="deployment"}  ) by (namespace,workload) , 0.01) > 1000
+        for: 5m
+        labels:
+          Network: Network_transmit_packets
+          severity: Warning
+        annotations:
+          summary: "App-网络数据包-发送包"
+          description: "App {{ $labels.namespace }}/{{ $labels.workload }} 5分钟平均丢包超过1000Pps."
+          value: "{{ $value }}Pps"
+
+
+
+    # --------------------------prometheus告警内容自定义查询记录-------------------------------
+    - name: node-exporter.rules.record.expr
+      rules:
+      - expr: |
+          count without (cpu) (
+            count without (mode) (
+              node_cpu_seconds_total{job="expose-node-metrics"}
+            )
+          )
+        record: instance:node_num_cpu:sum
+      - expr: |
+          1 - avg without (cpu, mode) (
+            rate(node_cpu_seconds_total{job="expose-node-metrics", mode="idle"}[1m])
+          )
+        record: instance:node_cpu_utilisation:rate1m
+      - expr: |
+          (
+            node_load1{job="expose-node-metrics"}
+          /
+            instance:node_num_cpu:sum{job="expose-node-metrics"}
+          )
+        record: instance:node_load1_per_cpu:ratio
+      - expr: |
+          1 - (
+            node_memory_MemAvailable_bytes{job="expose-node-metrics"}
+          /
+            node_memory_MemTotal_bytes{job="expose-node-metrics"}
+          )
+        record: instance:node_memory_utilisation:ratio
+      - expr: |
+          rate(node_vmstat_pgmajfault{job="expose-node-metrics"}[1m])
+        record: instance:node_vmstat_pgmajfault:rate1m
+      - expr: |
+          rate(node_disk_io_time_seconds_total{job="expose-node-metrics", device=~"nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+"}[1m])
+        record: instance_device:node_disk_io_time_seconds:rate1m
+      - expr: |
+          rate(node_disk_io_time_weighted_seconds_total{job="expose-node-metrics", device=~"nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+"}[1m])
+        record: instance_device:node_disk_io_time_weighted_seconds:rate1m
+      - expr: |
+          sum without (device) (
+            rate(node_network_receive_bytes_total{job="expose-node-metrics", device!="lo"}[1m])
+          )
+        record: instance:node_network_receive_bytes_excluding_lo:rate1m
+      - expr: |
+          sum without (device) (
+            rate(node_network_transmit_bytes_total{job="expose-node-metrics", device!="lo"}[1m])
+          )
+        record: instance:node_network_transmit_bytes_excluding_lo:rate1m
+      - expr: |
+          sum without (device) (
+            rate(node_network_receive_drop_total{job="expose-node-metrics", device!="lo"}[1m])
+          )
+        record: instance:node_network_receive_drop_excluding_lo:rate1m
+      - expr: |
+          sum without (device) (
+            rate(node_network_transmit_drop_total{job="expose-node-metrics", device!="lo"}[1m])
+          )
+        record: instance:node_network_transmit_drop_excluding_lo:rate1m
+    - name: apiserver.rules.record.expr
+      rules:
+      - expr: |
+          histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="kubernetes"}[5m])) without(instance, pod))
+        labels:
+          quantile: "0.99"
+        record: cluster_quantile:apiserver_request_duration_seconds:histogram_quantile
+      - expr: |
+          histogram_quantile(0.9, sum(rate(apiserver_request_duration_seconds_bucket{job="kubernetes"}[5m])) without(instance, pod))
+        labels:
+          quantile: "0.9"
+        record: cluster_quantile:apiserver_request_duration_seconds:histogram_quantile
+      - expr: |
+          histogram_quantile(0.5, sum(rate(apiserver_request_duration_seconds_bucket{job="kubernetes"}[5m])) without(instance, pod))
+        labels:
+          quantile: "0.5"
+        record: cluster_quantile:apiserver_request_duration_seconds:histogram_quantile
+    - name: k8s.rules.record.expr
+      rules:
+      - expr: |
+          sum(rate(container_cpu_usage_seconds_total{job="expose-kubelets-metrics", image!="", container!="POD"}[5m])) by (namespace)
+        record: namespace:container_cpu_usage_seconds_total:sum_rate
+      - expr: |
+          sum by (namespace, pod, container) (
+            rate(container_cpu_usage_seconds_total{job="expose-kubelets-metrics", image!="", container!="POD"}[5m])
+          ) * on (namespace, pod) group_left(node) max by(namespace, pod, node) (kube_pod_info)
+        record: node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate
+      - expr: |
+          container_memory_working_set_bytes{job="expose-kubelets-metrics", image!=""}
+          * on (namespace, pod) group_left(node) max by(namespace, pod, node) (kube_pod_info)
+        record: node_namespace_pod_container:container_memory_working_set_bytes
+      - expr: |
+          container_memory_rss{job="expose-kubelets-metrics", image!=""}
+          * on (namespace, pod) group_left(node) max by(namespace, pod, node) (kube_pod_info)
+        record: node_namespace_pod_container:container_memory_rss
+      - expr: |
+          container_memory_cache{job="expose-kubelets-metrics", image!=""}
+          * on (namespace, pod) group_left(node) max by(namespace, pod, node) (kube_pod_info)
+        record: node_namespace_pod_container:container_memory_cache
+      - expr: |
+          container_memory_swap{job="expose-kubelets-metrics", image!=""}
+          * on (namespace, pod) group_left(node) max by(namespace, pod, node) (kube_pod_info)
+        record: node_namespace_pod_container:container_memory_swap
+      - expr: |
+          sum(container_memory_usage_bytes{job="expose-kubelets-metrics", image!="", container!="POD"}) by (namespace)
+        record: namespace:container_memory_usage_bytes:sum
+      - expr: |
+          sum by (namespace, label_name) (
+              sum(kube_pod_container_resource_requests_memory_bytes{job="expose-kubernetes-metrics"} * on (endpoint, instance, job, namespace, pod, service) group_left(phase) (kube_pod_status_phase{phase=~"Pending|Running"} == 1)) by (namespace, pod)
+            * on (namespace, pod)
+              group_left(label_name) kube_pod_labels{job="expose-kubernetes-metrics"}
+          )
+        record: namespace:kube_pod_container_resource_requests_memory_bytes:sum
+      - expr: |
+          sum by (namespace, label_name) (
+              sum(kube_pod_container_resource_requests_cpu_cores{job="expose-kubernetes-metrics"} * on (endpoint, instance, job, namespace, pod, service) group_left(phase) (kube_pod_status_phase{phase=~"Pending|Running"} == 1)) by (namespace, pod)
+            * on (namespace, pod)
+              group_left(label_name) kube_pod_labels{job="expose-kubernetes-metrics"}
+          )
+        record: namespace:kube_pod_container_resource_requests_cpu_cores:sum
+      - expr: |
+          sum(
+            label_replace(
+              label_replace(
+                kube_pod_owner{job="expose-kubernetes-metrics", owner_kind="ReplicaSet"},
+                "replicaset", "$1", "owner_name", "(.*)"
+              ) * on(replicaset, namespace) group_left(owner_name) kube_replicaset_owner{job="expose-kubernetes-metrics"},
+              "workload", "$1", "owner_name", "(.*)"
+            )
+          ) by (namespace, workload, pod)
+        labels:
+          workload_type: deployment
+        record: mixin_pod_workload
+      - expr: |
+          sum(
+            label_replace(
+              kube_pod_owner{job="expose-kubernetes-metrics", owner_kind="DaemonSet"},
+              "workload", "$1", "owner_name", "(.*)"
+            )
+          ) by (namespace, workload, pod)
+        labels:
+          workload_type: daemonset
+        record: mixin_pod_workload
+      - expr: |
+          sum(
+            label_replace(
+              kube_pod_owner{job="expose-kubernetes-metrics", owner_kind="StatefulSet"},
+              "workload", "$1", "owner_name", "(.*)"
+            )
+          ) by (namespace, workload, pod)
+        labels:
+          workload_type: statefulset
+        record: mixin_pod_workload
+    - name: scheduler.rules.record.expr
+      rules:
+      - expr: |
+          histogram_quantile(0.99, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket{job="expose-kube-scheduler-metrics"}[5m])) without(instance, pod))
+        labels:
+          quantile: "0.99"
+        record: cluster_quantile:scheduler_e2e_scheduling_duration_seconds:histogram_quantile
+      - expr: |
+          histogram_quantile(0.99, sum(rate(scheduler_scheduling_algorithm_duration_seconds_bucket{job="expose-kube-scheduler-metrics"}[5m])) without(instance, pod))
+        labels:
+          quantile: "0.99"
+        record: cluster_quantile:scheduler_scheduling_algorithm_duration_seconds:histogram_quantile
+      - expr: |
+          histogram_quantile(0.99, sum(rate(scheduler_binding_duration_seconds_bucket{job="expose-kube-scheduler-metrics"}[5m])) without(instance, pod))
+        labels:
+          quantile: "0.99"
+        record: cluster_quantile:scheduler_binding_duration_seconds:histogram_quantile
+      - expr: |
+          histogram_quantile(0.9, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket{job="expose-kube-scheduler-metrics"}[5m])) without(instance, pod))
+        labels:
+          quantile: "0.9"
+        record: cluster_quantile:scheduler_e2e_scheduling_duration_seconds:histogram_quantile
+      - expr: |
+          histogram_quantile(0.9, sum(rate(scheduler_scheduling_algorithm_duration_seconds_bucket{job="expose-kube-scheduler-metrics"}[5m])) without(instance, pod))
+        labels:
+          quantile: "0.9"
+        record: cluster_quantile:scheduler_scheduling_algorithm_duration_seconds:histogram_quantile
+      - expr: |
+          histogram_quantile(0.9, sum(rate(scheduler_binding_duration_seconds_bucket{job="expose-kube-scheduler-metrics"}[5m])) without(instance, pod))
+        labels:
+          quantile: "0.9"
+        record: cluster_quantile:scheduler_binding_duration_seconds:histogram_quantile
+      - expr: |
+          histogram_quantile(0.5, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket{job="expose-kube-scheduler-metrics"}[5m])) without(instance, pod))
+        labels:
+          quantile: "0.5"
+        record: cluster_quantile:scheduler_e2e_scheduling_duration_seconds:histogram_quantile
+      - expr: |
+          histogram_quantile(0.5, sum(rate(scheduler_scheduling_algorithm_duration_seconds_bucket{job="expose-kube-scheduler-metrics"}[5m])) without(instance, pod))
+        labels:
+          quantile: "0.5"
+        record: cluster_quantile:scheduler_scheduling_algorithm_duration_seconds:histogram_quantile
+      - expr: |
+          histogram_quantile(0.5, sum(rate(scheduler_binding_duration_seconds_bucket{job="expose-kube-scheduler-metrics"}[5m])) without(instance, pod))
+        labels:
+          quantile: "0.5"
+        record: cluster_quantile:scheduler_binding_duration_seconds:histogram_quantile
+    - name: node.rules.record.expr
+      rules:
+      - expr: sum(min(kube_pod_info) by (node))
+        record: ':kube_pod_info_node_count:'
+      - expr: |
+          max(label_replace(kube_pod_info{job="expose-kubernetes-metrics"}, "pod", "$1", "pod", "(.*)")) by (node, namespace, pod)
+        record: 'node_namespace_pod:kube_pod_info:'
+      - expr: |
+          count by (node) (sum by (node, cpu) (
+            node_cpu_seconds_total{job="expose-node-metrics"}
+          * on (namespace, pod) group_left(node)
+            node_namespace_pod:kube_pod_info:
+          ))
+        record: node:node_num_cpu:sum
+      - expr: |
+          sum(
+            node_memory_MemAvailable_bytes{job="expose-node-metrics"} or
+            (
+              node_memory_Buffers_bytes{job="expose-node-metrics"} +
+              node_memory_Cached_bytes{job="expose-node-metrics"} +
+              node_memory_MemFree_bytes{job="expose-node-metrics"} +
+              node_memory_Slab_bytes{job="expose-node-metrics"}
+            )
+          )
+        record: :node_memory_MemAvailable_bytes:sum
+    - name: prometheus.rules.record.expr
+      rules:
+      - expr: sum(rate(node_cpu_seconds_total{mode!="idle",mode!="iowait"}[3m])) BY
+          (instance)
+        record: instance:node_cpu:rate:sum
+      - expr: sum((node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_free_bytes{mountpoint="/"}))
+          BY (instance)
+        record: instance:node_filesystem_usage:sum
+      - expr: sum(rate(node_network_receive_bytes_total[3m])) BY (instance)
+        record: instance:node_network_receive_bytes:rate:sum
+      - expr: sum(rate(node_network_transmit_bytes_total[3m])) BY (instance)
+        record: instance:node_network_transmit_bytes:rate:sum
+      - expr: sum(rate(node_cpu_seconds_total{mode!="idle",mode!="iowait"}[5m])) WITHOUT
+          (cpu, mode) / ON(instance) GROUP_LEFT() count(sum(node_cpu_seconds_total)
+          BY (instance, cpu)) BY (instance)
+        record: instance:node_cpu:ratio
+      - expr: sum(rate(node_cpu_seconds_total{mode!="idle",mode!="iowait"}[5m]))
+        record: cluster:node_cpu:sum_rate5m
+      - expr: cluster:node_cpu_seconds_total:rate5m / count(sum(node_cpu_seconds_total)
+          BY (instance, cpu))
+        record: cluster:node_cpu:ratio
+#    - name: General Rules
+#      rules:
+#      - alert: Watchdog
+#        expr: vector(1)
+#        for: 2m
+#        labels:
+#          severity: Critical
+#        annotations:
+#          summary: "看门狗"
+#          description: "用于监控告警系统是否正常工作，可以收到消息，则告警系统正常工作"
+#          value: "{{ $value }}"
+
+
+
+
+
+
+
+

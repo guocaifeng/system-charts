@@ -1,0 +1,25 @@
+replicaCount: 1
+namespace: cattle-prometheus
+
+image:
+  repository: dockerhub.cyai.com/public/webhook-paas
+  tag: 1.0.1
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: registry
+
+# 单独添加环境变量
+env:
+  - name: URLS
+    value: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=2f03016b-a7c8-417e-b157-cd10f28f4b1b;https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=2f03016b-a7c8-417e-b157-cd10f28f4b1b
+
+type1: ClusterIP
+type2: NodePort
+
+service:
+  typelower: clusterip
+  type: ClusterIP
+  port: 5000
+  targetPort: 5000
+

@@ -1,0 +1,420 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-cluster-cattle-prometheus-rulefiles-consutom
+  namespace: cattle-prometheus
+data:
+  cattle-prometheus-compatible-v116-deprecated-metrics.yaml: |
+    groups:
+    - name: Pod Rules
+      rules:
+      - alert: "Pod-CPU"
+        expr: sum(rate(container_cpu_usage_seconds_total{container!=""}[5m])) by (pod) > 1000
+        for: 10m
+        labels:
+          severity: Warning
+        annotations:
+          summary: "Pod-CPU"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} CPU使用大于1000mCPU."
+          value: "{{ $value }}mCPU"
+      - alert: "Pod-Memory"
+        expr: sum(container_memory_working_set_bytes{container!=""}) by (pod)/1024/1024/1024 > 3
+        for: 10m
+        labels:
+          severity: Warning
+        annotations:
+          summary: "Pod-Memory"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} Memory使用大于3G."
+          value: "{{ $value }}G"
+      - alert: "磁盘I/O"
+        expr: sum(rate(container_fs_reads_bytes_total{container!=""}[5m])) by (pod)/1024/1024 > 1
+        for: 5m
+        labels:
+          DiskioRead: DiskioRead
+          severity: Warning
+        annotations:
+          summary: "磁盘I/O-读"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 5分钟平均磁盘读I/O较高,已经超过1M/s."
+          value: "{{ $value }}Mbps"
+      - alert: "磁盘I/O"
+        expr: sum(rate(container_fs_writes_bytes_total{container!=""}[5m])) by (pod)/1024/1024 > 1
+        for: 5m
+        labels:
+          DiskioWrite: DiskioWrite
+          severity: Warning
+        annotations:
+          summary: "磁盘I/O-写"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 5分钟平均磁盘写I/O较高,已经超过1M/s."
+          value: "{{ $value }}Mbps"
+      - alert: "网络I/O"
+        expr: sum(rate(container_network_receive_bytes_total{container!=""}[5m])) by (pod) /1024/1024 > 1
+        for: 5m
+        labels:
+          Network: Network_receive
+          severity: Warning
+        annotations:
+          summary: "网络I/O-接收速率"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 5分钟平均网络I/O-接收速率超过1Mbps."
+          value: "{{ $value }}Mbps"
+      - alert: "网络I/O"
+        expr: sum(rate(container_network_transmit_bytes_total{container!=""}[5m])) by (pod) /1024/1024 > 1
+        for: 5m
+        labels:
+          Network: Network_transmit
+          severity: Warning
+        annotations:
+          summary: "网络I/O-发送速率"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 5分钟平均网络I/O-发送速率超过1Mbps."
+          value: "{{ $value }}Mbps"
+      - alert: "网络数据包"
+        expr: sum(rate(container_network_receive_packets_dropped_total{container!=""}[5m])) by (pod) > 100
+        for: 5m
+        labels:
+          Network: Network_receive_drop
+          severity: Warning
+        annotations:
+          summary: "网络数据包-接收丢包"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 5分钟平均接收丢包超过100Pps."
+          value: "{{ $value }}Pps"
+      - alert: "网络数据包"
+        expr: sum(rate(container_network_receive_errors_total{container!=""}[5m])) by (pod) > 20
+        for: 5m
+        labels:
+          Network: Network_receive_errs
+          severity: Warning
+        annotations:
+          summary: "网络数据包-接收错误包"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 5分钟平均接收错误包超过20Pps."
+          value: "{{ $value }}Pps"
+      - alert: "网络数据包"
+        expr: sum(rate(container_network_receive_packets_total{container!=""}[5m])) by (pod) > 1000
+        for: 5m
+        labels:
+          Network: Network_receive_packets
+          severity: Warning
+        annotations:
+          summary: "网络数据包-接收包"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 5分钟平均丢包超过1000Pps."
+          value: "{{ $value }}Pps"
+      - alert: "网络数据包"
+        expr: sum(rate(container_network_transmit_packets_dropped_total{container!=""}[5m])) by (pod) > 100
+        for: 5m
+        labels:
+          Network: Network_transmit_drop
+          severity: Warning
+        annotations:
+          summary: "网络数据包-发送丢包"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 5分钟平均接收丢包超过100Pps."
+          value: "{{ $value }}Pps"
+      - alert: "网络数据包"
+        expr: sum(rate(container_network_transmit_errors_total{container!=""}[5m])) by (pod) > 20
+        for: 5m
+        labels:
+          Network: Network_transmit_errs
+          severity: Warning
+        annotations:
+          summary: "网络数据包-发送错误包"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 5分钟平均接收错误包超过20Pps."
+          value: "{{ $value }}Pps"
+      - alert: "网络数据包"
+        expr: sum(rate(container_network_transmit_packets_total{container!=""}[5m])) by (pod) > 1000
+        for: 5m
+        labels:
+          Network: Network_transmit_packets
+          severity: Warning
+        annotations:
+          summary: "网络数据包-发送包"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 5分钟平均丢包超过1000Pps."
+          value: "{{ $value }}Pps"
+
+
+
+
+
+
+
+    - name: kubernetes-apps
+      rules:
+      - alert: "KubePodCrashLooping"
+        expr: |
+          rate(kube_pod_container_status_restarts_total{job="expose-kubernetes-metrics"}[15m]) * 60 * 5 > 0
+        for: 15m
+        labels:
+          severity: Critical
+        annotations:
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 重启 {{ printf \"%.2f\" $value }} 次/5m."
+          summary: "KubePodCrashLooping"
+          value: "{{ $labels.namespace }}/{{ $labels.pod }}"
+      - alert: "KubePodNotReady"
+        expr: |
+          sum by (namespace, pod) (kube_pod_status_phase{job="expose-kubernetes-metrics", phase=~"Failed|Pending|Unknown"} * on(namespace, pod) group_left(owner_kind) kube_pod_owner{owner_kind!="Job"}) > 0
+        for: 15m
+        labels:
+          severity: Critical
+        annotations:
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 已超过15分钟处于未就绪状态."
+          summary: "KubePodNotReady"
+          value: "{{ $labels.namespace }}/{{ $labels.pod }}"
+      - alert: "KubeDeploymentGenerationMismatch"
+        expr: |
+          kube_deployment_status_observed_generation{job="expose-kubernetes-metrics"}
+            !=
+          kube_deployment_metadata_generation{job="expose-kubernetes-metrics"}
+        for: 15m
+        labels:
+          severity: Critical
+        annotations:
+          description: "应用 generation {{ $labels.namespace }}/{{ $labels.deployment }} 已超过15分钟处于正在运行状态与计划运行状态不匹配不能回滚."
+          summary: "KubeDeploymentGenerationMismatch"
+          value: "{{ $labels.namespace }}/{{ $labels.deployment }}"
+      - alert: "KubeDeploymentReplicasMismatch"
+        expr: |
+          kube_deployment_spec_replicas{job="expose-kubernetes-metrics"}
+            !=
+          kube_deployment_status_replicas_available{job="expose-kubernetes-metrics"}
+        for: 15m
+        labels:
+          severity: Critical
+        annotations:
+          description: "应用 replicas {{ $labels.namespace }}/{{ $labels.deployment }} 已超过15分钟副本数不能匹配预期副本数."
+          summary: "KubeDeploymentReplicasMismatch"
+          value: "{{ $labels.namespace }}/{{ $labels.deployment }}"
+      - alert: KubeStatefulSetReplicasMismatch
+        expr: |
+          kube_statefulset_status_replicas_ready{job="expose-kubernetes-metrics"}
+            !=
+          kube_statefulset_status_replicas{job="expose-kubernetes-metrics"}
+        for: 15m
+        labels:
+          severity: Critical
+        annotations:
+          description: "应用 replicas {{ $labels.namespace }}/{{ $labels.statefulset }} 已超过15分钟副本数不能匹配预期副本数."
+          summary: "KubeStatefulSetReplicasMismatch"
+          value: "{{ $labels.namespace }}/{{ $labels.statefulset }}"
+      - alert: "KubeStatefulSetGenerationMismatch"
+        expr: |
+          kube_statefulset_status_observed_generation{job="expose-kubernetes-metrics"}
+            !=
+          kube_statefulset_metadata_generation{job="expose-kubernetes-metrics"}
+        for: 15m
+        labels:
+          severity: Critical
+        annotations:
+          description: "应用 generation {{ $labels.namespace }}/{{ $labels.statefulset }} 已超过15分钟处于正在运行状态与计划运行状态不匹配不能回滚."
+          summary: "KubeStatefulSetGenerationMismatch"
+          value: "{{ $labels.namespace }}/{{ $labels.statefulset }}"
+      - alert: "KubeStatefulSetUpdateNotRolledOut"
+        expr: |
+          max without (revision) (
+            kube_statefulset_status_current_revision{job="expose-kubernetes-metrics"}
+              unless
+            kube_statefulset_status_update_revision{job="expose-kubernetes-metrics"}
+          )
+            *
+          (
+            kube_statefulset_replicas{job="expose-kubernetes-metrics"}
+              !=
+            kube_statefulset_status_replicas_updated{job="expose-kubernetes-metrics"}
+          )
+        for: 15m
+        labels:
+          severity: Critical
+        annotations:
+          description: "StatefulSet {{ $labels.namespace }}/{{ $labels.statefulset }} 更新不能回滚."
+          summary: "KubeStatefulSetUpdateNotRolledOut"
+          value: "{{ $labels.namespace }}/{{ $labels.statefulset }}"
+      - alert: KubeDaemonSetRolloutStuck
+        expr: |
+          kube_daemonset_status_number_ready{job="expose-kubernetes-metrics"}
+            /
+          kube_daemonset_status_desired_number_scheduled{job="expose-kubernetes-metrics"} < 1.00
+        for: 15m
+        labels:
+          severity: Critical
+        annotations:
+          description: "{{ $labels.namespace }}/{{ $labels.daemonset }} 已经超过15分钟,仅是调度成功,仍处于未运行状态."
+          summary: "KubeDaemonSetRolloutStuck"
+          value: "{{ $labels.namespace }}/{{ $labels.daemonset }}"
+      - alert: KubeDaemonSetNotScheduled
+        annotations:
+          description: "Pods of DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset }} 已经超过10分钟不能调度成功."
+          summary: "KubeDaemonSetNotScheduled"
+          value: "{{ $labels.namespace }}/{{ $labels.daemonset }}"
+        expr: |
+          kube_daemonset_status_desired_number_scheduled{job="expose-kubernetes-metrics"}
+            -
+          kube_daemonset_status_current_number_scheduled{job="expose-kubernetes-metrics"} > 0
+        for: 10m
+        labels:
+          severity: Warning
+      - alert: "KubeDaemonSetMisScheduled"
+        expr: |
+          kube_daemonset_status_number_misscheduled{job="expose-kubernetes-metrics"} > 0
+        for: 10m
+        labels:
+          severity: Warning
+        annotations:
+          description: "{{ $value }} Pods of DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset }} 未在指定的位置进行调度并运行."
+          summary: "KubeDaemonSetMisScheduled"
+          value: "{{ $labels.namespace }}/{{ $labels.daemonset }}/{{ $value}}"
+      - alert: KubeJobCompletion
+        annotations:
+          description: "Job {{ $labels.namespace }}/{{ $labels.job_name }} 需要超过1小时的时间才能完成."
+          summary: "KubeJobCompletion"
+          value: "{{ $labels.namespace }}/{{ $labels.job_name }}"
+        expr: |
+          kube_job_spec_completions{job="expose-kubernetes-metrics"} - kube_job_status_succeeded{job="expose-kubernetes-metrics"}  > 0
+        for: 1h
+        labels:
+          severity: Warning
+      - alert: KubeJobFailed
+        annotations:
+          description: "Job {{ $labels.namespace }}/{{ $labels.job_name }} 未能完成."
+          summary: "KubeJobFailed"
+          value: "{{ $labels.namespace }}/{{ $labels.job_name }}"
+        expr: |
+          kube_job_failed{job="expose-kubernetes-metrics"}  > 0
+        for: 15m
+        labels:
+          severity: Warning
+      - alert: KubeHpaReplicasMismatch
+        annotations:
+          description: "HPA {{ $labels.namespace }}/{{ $labels.hpa }} 已经超过15分钟,未能匹配到预期的副本数."
+          summary: "KubeHpaReplicasMismatch"
+          value: "{{ $labels.namespace }}/{{ $labels.hpa }}"
+        expr: |
+          (kube_hpa_status_desired_replicas{job="expose-kubernetes-metrics"}
+            !=
+          kube_hpa_status_current_replicas{job="expose-kubernetes-metrics"})
+            and
+          changes(kube_hpa_status_current_replicas[15m]) == 0
+        for: 15m
+        labels:
+          severity: Warning
+      - alert: KubeHpaMaxedOut
+        annotations:
+          description: "HPA {{ $labels.namespace }}/{{ $labels.hpa }} 已经超过15分钟,一直在最大副本数量运行."
+          summary: "KubeHpaMaxedOut"
+          value: "{{ $labels.namespace }}/{{ $labels.hpa }}"
+        expr: |
+          kube_hpa_status_current_replicas{job="expose-kubernetes-metrics"}
+            ==
+          kube_hpa_spec_max_replicas{job="expose-kubernetes-metrics"}
+        for: 15m
+        labels:
+          severity: Warning
+    - name: Alertmanager Rules
+      rules:
+      - alert: "Alertmanager配置文件加载失败"
+        annotations:
+          summary: "Alertmanager配置文件加载失败"
+          value: "{{ $value }}"
+          description: "重新加载 Alertmanager 配置文件失败 {{ $labels.namespace }}/{{ $labels.pod}}."
+        expr: alertmanager_config_last_reload_successful{job="expose-alertmanager-metrics",namespace="cattle-prometheus"} == 0
+        for: 5m
+        labels:
+          severity: Warning
+    - name: kubelet
+      rules:
+      - alert: "KubeletDown"
+        expr: |
+          absent(up{job="expose-kubelets-metrics"} == 1)
+        for: 15m
+        labels:
+          severity: Critical
+        annotations:
+          description: "Kubelet 组件从Prometheus监测中失去了联系,集群出现了故障,请及时排查."
+          summary: "KubeletDown"
+          value: "{{ $labels.node }} --- {{ $value | humanizePercentage }}"
+      - alert: "节点未准备就绪"
+        expr: |
+          kube_node_status_condition{job="expose-kubernetes-metrics",condition="Ready",status="true"} == 0
+        for: 15m
+        labels:
+          severity: Warning
+        annotations:
+          description: "{{ $labels.node }} 服务器超过15分钟未准备就绪."
+          summary: "节点未准备就绪"
+          value: "{{ $labels.node }}"
+      - alert: "节点状态"
+        expr: |
+          kube_node_spec_taint{job="expose-kubernetes-metrics",key="node.kubernetes.io/unreachable",effect="NoSchedule"} == 1
+        labels:
+          severity: Warning
+        annotations:
+          description: "{{ $labels.node }} 服务器处于不可调度状态."
+          summary: "节点处于不可调度状态"
+          value: "{{ $labels.node }}"
+      - alert: "节点运行Pod超载"
+        expr: |
+          max(max(kubelet_running_pod_count{job="expose-kubelets-metrics"}) by(instance) * on(instance) group_left(node) kubelet_node_name{job="expose-kubelets-metrics"}) by(node) / max(kube_node_status_capacity_pods{job="expose-kubernetes-metrics"}) by(node) > 0.95
+        for: 15m
+        labels:
+          severity: Warning
+        annotations:
+          description: "{{ $labels.node }} 服务器上可运行的Pod数量已经超过服务器容量的95%."
+          summary: "节点运行Pod超载"
+          value: "{{ $value }}"
+
+    - name: ApiServer Rules
+      rules:
+      - alert: "ApiServer延迟"
+        expr: avg(apiserver_request_latencies_sum / apiserver_request_latencies_count) by (instance, verb) /1e+06/1000 > 10
+        for: 10m
+        labels:
+          severity: Warning
+        annotations:
+          summary: "ApiServer延迟"
+          description: "API Server 的 {{ $labels.verb }} 操作延迟超过10秒,请检查服务器网络状况."
+          value: "{{ $value }}s"
+      - alert: "ApiServer请求错误率"
+        expr: sum(rate(apiserver_request_count{code=~"5.."}[5m])) by (code) / sum(rate(apiserver_request_count[5m])) by (code) * 100 > 1
+        for: 10m
+        labels:
+          severity: Warning
+        annotations:
+          summary: "ApiServer请求错误率"
+          description: "ApiServer请求错误率超过1%."
+          value: "{{ $value }}%"
+      - alert: "ApiServer请求错误率"
+        expr: sum(rate(apiserver_request_count{code=~"5.."}[5m])) by (code) / sum(rate(apiserver_request_count[5m])) by (code) * 100 > 5
+        for: 10m
+        labels:
+          severity: Critical
+        annotations:
+          summary: "ApiServer请求错误率"
+          description: "ApiServer请求错误率超过5%."
+          value: "{{ $value }}%"
+
+    - name: ControllerManager Rules
+      rules:
+      - alert: "ControllerManager失联"
+        expr: absent(up{job="expose-kube-cm-metrics"} == 1)
+        for: 15m
+        labels:
+          severity: Critical
+        annotations:
+          description: "ControllerManager 组件从Prometheus监测中失去了联系,集群出现了故障,请及时排查."
+          summary: "ControllerManager失联"
+          value: "{{ $value }}"
+    - name: Scheduler Rules
+      rules:
+      - alert: "Scheduler失联"
+        expr: |
+          absent(up{job="expose-kube-scheduler-metrics"} == 1)
+        for: 15m
+        labels:
+          severity: Critical
+        annotations:
+          description: "Scheduler 组件从Prometheus监测中失去了联系,集群出现了故障,请及时排查."
+          summary: "Scheduler失联"
+          value: "{{ $value }}"
+      - alert: "调度失败的Pods"
+        expr: kube_pod_status_scheduled{condition="false"}>1
+        for: 10m
+        labels:
+          severity: Critical
+        annotations:
+          summary: "调度失败的Pods"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 调度失败,请检查次Pod状态(0成功,1失败)."
+          value: "{{ $value }}"
